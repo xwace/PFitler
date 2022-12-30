@@ -9,15 +9,12 @@ from numpy.random import *
 def resample(weights):
 
     n = len(weights)
-
     indices = []
 
     # 求出离散累积密度函数(CDF)
-
     C = [0.] + [sum(weights[:i+1]) for i in range(n)]
 
     # 选定一个随机初始点
-
     u0, j = random(), 0
 
     for u in [(u0+i)/n for i in range(n)]: # u 线性增长到 1
@@ -36,8 +33,10 @@ def particlefilter(sequence, pos, stepsize, n):
     '''
 
     seq = iter(sequence)
+
     x = ones((n, 2), int) * pos # 100 个初始位置(中心)
     f0 = seq.__next__()[tuple(pos)] * ones(n) # 目标的颜色模型， 100 个 255
+
     yield pos, x, ones(n)/n # 返回第一帧期望位置(expectation pos)，粒子(x)和权重
 
     for im in seq:
@@ -48,6 +47,8 @@ def particlefilter(sequence, pos, stepsize, n):
         x = x.clip(zeros(2), array(im.shape)-1).astype(int)
 
         f = im[tuple(x.T)] # 得到每个粒子的像素值
+        # print("len of f: ",len(f))
+        f0 = f0[:len(f)]
         w = 1./(1. + (f0-f)**2) # 求与目标模型的差异, w 是与粒子一一对应的权重向量
 
         # 可以看到像素值为 255 的权重最大(1.0)
@@ -56,8 +57,7 @@ def particlefilter(sequence, pos, stepsize, n):
         yield sum(x.T*w, axis=1), x, w # 返回目标期望位置，粒子和对应的权重
 
         if 1./sum(w**2) < n/2.: # 如果当前帧粒子退化:
-            pass
-            # x = x[resample(w),:] # 根据权重重采样, 有利于后续帧有效采样
+            x = x[resample(w),:] # 根据权重重采样, 有利于后续帧有效采样
 
 if __name__ == "__main__":
 
@@ -78,21 +78,16 @@ if __name__ == "__main__":
     x0 = array([120, 160]) # 第一帧的框中心坐标
 
     # 为每张图片添加一个运动轨迹为 xs 的白色方块(像素值是255, 每帧横坐标加3,竖坐标加2)
-
     xs = vstack((arange(20)*3, arange(20)*2)).T + x0 # vstack: 竖直叠加
 
     for t, x in enumerate(xs): # t 从 0 开始， x 从 xs[0] 开始
 
         # slice 的用法也很有意思，可以很方便用来表示被访问数组seq的下标范围
-
         xslice = slice(x[0]-8, x[0]+8)
-
         yslice = slice(x[1]-8, x[1]+8)
-
         seq[t][xslice, yslice] = 255
 
     # 跟踪白框
-
     for im, p in izip(seq, particlefilter(seq, x0, 8, 100)): #
 
         pos, xs, ws = p
